@@ -1,7 +1,6 @@
 import re
 import kcisorder
 import requests
-import json
 from datetime import datetime
 import yaml
 import os
@@ -70,8 +69,8 @@ if clean_existing:
         "WARNING: clean_existing is set to true, meals that are already been ordered will be cleaned"
     )
 
-def check_remaining(meal):
-    return meal.id is None or meal.remaining == 0
+def check_if_any_remaining(meal):
+    return not (meal.id is None or meal.remaining == 0)
 
 def does_hit_rule(rule, meal):
     if not (
@@ -107,15 +106,15 @@ def does_hit_rule(rule, meal):
 def match_meal(rule, meals, print_hit=True) -> kcisorder.Meal | None:
     if rule.get("random") is not None and rule.get("random"):
         if rule.get('match') is None:
-            hit = meals
+            hits = meals
         else:
-            hit = []
-            for single_meal in meals:
-                if does_hit_rule(rule, single_meal) and check_remaining(single_meal):
-                    hit.append(single_meal)
-            if len(hit) == 0:
+            hits = []
+            for meal in meals:
+                if does_hit_rule(rule, meal) and check_if_any_remaining(meal):
+                    hits.append(meal)
+            if len(hits) == 0:
                 return
-        random_hit = hit[random.randint(0, len(hit) - 1)]
+        random_hit = hits[random.randint(0, len(hits) - 1)]
         if print_hit:
             print(
                 f"Hit {random_hit} (random: {rule})"
@@ -123,7 +122,7 @@ def match_meal(rule, meals, print_hit=True) -> kcisorder.Meal | None:
         return random_hit
     for meal in meals:
         if does_hit_rule(rule, meal):
-            if check_remaining(meal):
+            if not check_if_any_remaining(meal):
                 print(
                     f"Hit {meal} (match: {rule}) but it is sold out"
                 )
@@ -137,8 +136,8 @@ def match_meal(rule, meals, print_hit=True) -> kcisorder.Meal | None:
 meal_list = None
 retries_adapter = HTTPAdapter(max_retries=Retry(total=config.get('retries', 5), backoff_factor=0.1, status_forcelist=[ 500, 502, 503, 504 ]))
 
-print()
 for target in target_list:
+    print()
     if 'dinner' not in target and 'lunch' not in target:
         print(f"WARNING: no rule specified for order {target.get('name', '[unnamed]')}")
         continue
@@ -193,6 +192,4 @@ for target in target_list:
 
     kcisorder.submit_order(session, meals_to_order)
 
-    print()
-
-print("All done")
+print("\nAll done")
