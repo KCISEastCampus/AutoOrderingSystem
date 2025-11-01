@@ -7,7 +7,8 @@ from .functions import (
     get_meals_ordered
 )
 from .classes import (
-    Meal
+    Meal,
+    LoginError
 )
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     'submit_order',
     'clean_meals_ordered',
     'get_meals_ordered',
-    'Meal'
+    'Meal',
+    'LoginError'
 ]

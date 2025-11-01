@@ -1,9 +1,9 @@
+from os import error
 import re
 import requests
-import traceback
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 import urllib.parse
-from .classes import Meal
+from .classes import *
 
 base_url = "https://ordering.kcisec.com/ordering/"
 login_url = urllib.parse.urljoin(base_url, "login.asp?action=login")
@@ -11,7 +11,7 @@ index_url = urllib.parse.urljoin(base_url, "index.asp")
 orders_url = urllib.parse.urljoin(base_url, "orders.asp?d=3")
 user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
 
-def login(username: str, password: str, request_session: requests.Session):
+def login(username: str, password: str, request_session: requests.Session, verify=True):
     headers = {
         "User-Agent": user_agent,
         "Content-Type": "application/x-www-form-urlencoded",
@@ -19,36 +19,102 @@ def login(username: str, password: str, request_session: requests.Session):
     payload = {"User": username, "Pwd": password}
 
     try:
-        response = request_session.post(login_url, headers=headers, data=payload)
+        response = request_session.post(login_url, headers=headers, data=payload, verify=verify)
         response.raise_for_status()
         soup = BeautifulSoup(response.text.encode("iso-8859-1").decode("gbk"), "html.parser")
-        if len(soup.body) == 2: # ['\n', <script>alert('帐号或密码错误，登录失败！');history.go(-1);</script>]
-            return None
+        if soup.body and len(soup.body) == 2: # ['\n', <script>alert('帐号或密码错误，登录失败！');history.go(-1);</script>]
+            alert_script = list(soup.body.children)[1]
+            if error_info := re.match(r"alert\s*\(\s*['\"](.*?)['\"]\s*\)", alert_script.string or ""):
+                raise LoginError(error_info.group(1))
+            raise LoginError("unknown error")
         return request_session
-    except requests.exceptions.RequestException:
-        traceback.print_exc()
-        return None
+    except requests.exceptions.RequestException as e:
+        # traceback.print_exc()
+        raise e
 
+def add_to_cart(meal_id: str, request_session: requests.Session, verify=True):
+    # whoever named cart as "buy_car" is a genius :trumbsup::trumbsup::trumbsup:
+    get_request(
+        request_session,
+        base_url + f"buy_car.asp?id={meal_id}",
+        headers={"User-Agent": user_agent},
+        verify=verify
+    )
 
-def get_meals(session: requests.Session):
+def get_meals_ordered(request_session: requests.Session, verify=True):
+    orders_page = get_request(request_session, orders_url, verify=verify)
+
+    soup = BeautifulSoup(
+        orders_page.text.encode("iso-8859-1").decode("gbk"), "html.parser"
+    )
+
+    ids = [
+        m.group(0)
+        for b in soup.find_all("input", value="delete", type="submit")
+        if isinstance(b, Tag)
+        and isinstance((dt := b.get("data-target")), str)
+        and (m := re.search(r"\d+$", dt))
+    ]
+
+    return ids
+
+def delete_meal_ordered(request_session: requests.Session, meal_id, verify=True):
+    get_request(request_session, f"{orders_url}&did={meal_id}", verify=verify)
+
+def clean_meals_ordered(request_session: requests.Session, verify=True):
+    meals_ordered = get_meals_ordered(request_session, verify=verify)
+    if meals_ordered is None:
+        return
+    for meal_id in meals_ordered:
+        delete_meal_ordered(request_session, meal_id, verify=verify)
+
+def submit_order(request_session: requests.Session, meal_list: list[Meal], verify=True):
+    headers = {
+        "User-Agent": user_agent,
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+    payload = []
+    for meal in meal_list:
+        payload.append(("reaID", meal.id))
+
+    response = post_request(
+        request_session,
+        base_url + "orders.asp?action=order_ok",
+        headers=headers,
+        payload=payload,
+        verify=verify
+    )
+
+    return response
+
+def get_request(request_session: requests.Session, url, headers=None, payload=None, verify=True):
+    response = request_session.get(url, headers=headers, data=payload, verify=verify)
+    response.raise_for_status()
+    return response
+
+def post_request(request_session: requests.Session, url, headers=None, payload=None, verify=True):
+    response = request_session.post(url, headers=headers, data=payload, verify=verify)
+    response.raise_for_status()
+    return response
+
+def get_meals(session: requests.Session, verify=True):
     """Scrapes meal data (lunch & dinner) for each available date."""
-    response = get_request(session, index_url, headers={"User-Agent": user_agent})
-    if response is None:
-        return None
+    response = get_request(session, index_url, headers={"User-Agent": user_agent}, verify=verify)
 
     soup = BeautifulSoup(response.text.encode("iso-8859-1").decode("gbk"), "html.parser")
     side_menu = soup.find("dl", class_="submenu")
     if side_menu is None:
-        print("kcisorder: Failed to get menu items!")
-        return None
+        raise Exception("Cannot load meals")
 
     order_links = side_menu.find_all("a")
     meals_by_date = []
 
     for order_link in order_links:
         href = order_link.get("href")
-        response = get_request(session, index_url + href, headers={"User-Agent": user_agent})
-        if response is None:
+        if not href:
+            continue
+        response = get_request(session, index_url + href, headers={"User-Agent": user_agent}, verify=verify)
+        if not response:
             continue
 
         day_soup = BeautifulSoup(response.text.encode("iso-8859-1").decode("gbk"), "html.parser")
@@ -107,77 +173,3 @@ def get_meals(session: requests.Session):
         meals_by_date.append(day_meals)
 
     return meals_by_date
-
-
-def add_to_cart(meal_id: str, request_session: requests.Session):
-    # whoever named cart as "buy_car" is a genius :trumbsup::trumbsup::trumbsup:
-    get_request(
-        request_session,
-        base_url + f"buy_car.asp?id={meal_id}",
-        headers={"User-Agent": user_agent},
-    )
-
-def get_meals_ordered(request_session: requests.Session):
-    orders_page = get_request(request_session, orders_url)
-
-    soup = BeautifulSoup(
-        orders_page.text.encode("iso-8859-1").decode("gbk"), "html.parser"
-    )
-    buttons = soup.findAll("input", value="delete", type="submit")
-
-    ids = []
-    for button in buttons:
-        data_target = button.get("data-target")
-        match_result = re.search(
-            "\\d+$",
-            data_target
-        ).group(0)
-        ids.append(match_result)
-
-    return ids
-
-def delete_meal_ordered(request_session: requests.Session, meal_id):
-    get_request(request_session, f"{orders_url}&did={meal_id}")
-
-def clean_meals_ordered(request_session: requests.Session):
-    meals_ordered = get_meals_ordered(request_session)
-    if meals_ordered is None:
-        return
-    for meal_id in meals_ordered:
-        delete_meal_ordered(request_session, meal_id)
-
-def submit_order(request_session: requests.Session, meal_list: list[Meal]):
-    headers = {
-        "User-Agent": user_agent,
-        "Content-Type": "application/x-www-form-urlencoded",
-    }
-    payload = []
-    for meal in meal_list:
-        payload.append(("reaID", meal.id))
-
-    response = post_request(
-        request_session,
-        base_url + "orders.asp?action=order_ok",
-        headers=headers,
-        payload=payload,
-    )
-
-    return response
-
-def get_request(request_session: requests.Session, url, headers=None, payload=None):
-    try:
-        response = request_session.get(url, headers=headers, data=payload)
-        response.raise_for_status()
-        return response
-    except requests.exceptions.RequestException:
-        traceback.print_exc()
-        return None
-
-def post_request(request_session: requests.Session, url, headers=None, payload=None):
-    try:
-        response = request_session.post(url, headers=headers, data=payload)
-        response.raise_for_status()
-        return response
-    except requests.exceptions.RequestException:
-        traceback.print_exc()
-        return None

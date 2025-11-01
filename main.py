@@ -1,4 +1,5 @@
 import re
+import traceback
 import kcisorder
 import requests
 from datetime import datetime
@@ -6,6 +7,7 @@ import yaml
 import os
 import random
 from requests.adapters import HTTPAdapter, Retry
+import urllib3
 
 print("KCIS auto order script")
 print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
@@ -34,6 +36,11 @@ target_list = config.get("orders")
 if target_list is None:
     print("WARNING: no orders found in config file")
     exit(0)
+
+do_verify = config.get("do_verify", True)
+if not do_verify:
+    print("WARNING: SSL certification verification is turned off!")
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 print(f"{len(target_list)} orders loaded")
 
@@ -133,8 +140,10 @@ def match_meal(rule, meals, print_hit=True) -> kcisorder.Meal | None:
                 )
             return meal
 
-meal_list = None
+meal_list = []
 retries_adapter = HTTPAdapter(max_retries=Retry(total=config.get('retries', 5), backoff_factor=0.1, status_forcelist=[ 500, 502, 503, 504 ]))
+
+success_count = 0
 
 for target in target_list:
     print()
@@ -149,22 +158,22 @@ for target in target_list:
     session = requests.session()
     session.mount('http://', retries_adapter)
     session.mount('https://', retries_adapter)
-    if kcisorder.login(target.get("id", ''), target.get("password", ''), session) != None:
+    try:
+        kcisorder.login(target.get("id", ''), target.get("password", ''), session, verify=do_verify)
         print("Logged in")
-    else:
-        print("Failed to log in! pls check your login credentials. skipping")
+    except Exception as e:
+        # traceback.print_exc()
+        print("Failed to log in:", e)
         continue
 
     if crawl_every or meal_list is None:
         print("Getting meals")
-        meal_list = kcisorder.get_meals(session)
+        try:
+            meal_list = kcisorder.get_meals(session, verify=do_verify)
+        except Exception as e:
+            print("Failed to get meal list:", e)
+            continue
         # print(meal_list)
-
-    if meal_list is None:
-        print(
-            "Failed to get meal list. pls check your internet! skipping"
-        )
-        continue
 
     # print(json.dumps(meals))
     print("Matching meals")
@@ -186,10 +195,21 @@ for target in target_list:
 
     if target.get("clean_existing", False) or clean_existing:
         print("Cleaning existing orders")
-        kcisorder.clean_meals_ordered(session)
+        try:
+            kcisorder.clean_meals_ordered(session, verify=do_verify)
+        except Exception as e:
+            print("Failed to clean orders:", e)
+            print("WARNING: NOT SKIPPING!")
 
     print("Submitting")
 
-    kcisorder.submit_order(session, meals_to_order)
+    try:
+        kcisorder.submit_order(session, meals_to_order, verify=do_verify)
+    except Exception as e:
+        print("Failed to submit order:", e)
+        continue
+
+    success_count += 1
 
 print("\nAll done")
+print(f"{success_count} orders submitted")

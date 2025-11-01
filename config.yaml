@@ -1,18 +1,22 @@
 # Example configuration file
 
 crawl_every: true # decide if the program crawls meal list for every user or crawls for the fisrt user and the rest follows this list
-# This is useful and speeds the program when users have the same meal lists.
-# Error may occurs when doing for users that have different meal lists.
+# speeds the program up if set to false because it doesn't need to scrap the meal list everytime
+# might fail if users have different meal lists
 # default: true
 clean_existing: false # decide if the program clean existing orders before ordering
 # default: false
 
-orders:
+verify: true # do verify SSL certification
+# sometimes the SSL certification isn't working and you might need to set this to false
+# default: true
+
+=orders:
 - id: 'MY_ID' # in string
-  name: example # for debugging and logging; will not effect program
+  name: example # for debugging and logging; will not affect program
   password: MY_PASSWORD
   lunch:
-  - cafeteria: 1 # specific a cafe (match all if not set)
+  - cafeteria: 1 # specify a cafeteria (match all if not set)
     match:
     - regex: i want this # match regular expression
     - regex: with this
@@ -22,16 +26,16 @@ orders:
   - cafeteria: 1
     match:
     - regex: third one
-    random: true # select one randomly between matched meals
+    random: true # select one randomly among matched meals
   - cafeteria: 1
     match:
     - regex: fourth choice
     - regex: i dont want this
       not: true # do not select
-    random: false # select the first one if random set to false (or unset)
+    random: false # select the first one if random is set to false (or unset)
   - cafeteria: 1
-    random: true # if no meal matched, select one randomly from 1st cafe
-  dinner: [] # lunch or dinner can be unset (do not proceed)
+    random: true # if no meal matched, select one randomly from the 1st cafeteria
+  dinner: [] # lunch or dinner can be unset (do not order)
 - id: 'ANOTHER_ID' # another account
   name: :)
   password: '114514' # string
@@ -51,6 +55,6 @@ orders:
   - :)
   - example # follow multiple ppl
   dinner:
-  - cafeteria: 1 # you can still add your own orders while following others
+  - cafeteria: 1 # you can still add your own orders while following others'
     match:
     - regex: meat
