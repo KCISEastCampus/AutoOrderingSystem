@@ -10,8 +10,8 @@ Features:
 - extendable Python library for ordering: `kcisorder`
 
 ## Installation
-Make sure you have Python 3.8+ installed :3c
-> Python version below 3.8 is not tested but it might still work
+Make sure you have Python 3.13+ installed :3c
+> NOTE: python version below 3.13 is not tested cus im too lazy but it might still work
 
 ```bash
 # Clone the repo
