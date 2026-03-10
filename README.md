@@ -1,6 +1,9 @@
 # AutoOrderingSystem
 > A Python script for automatically ordering meals for KCIS students
 
+> [!WARNING]
+> This project is deprecated!
+
 ## Description
 `AutoOrderingSystem` is a Python script that helps KCIS students order meals automatically so that students do not need to deal with the stupid ordering system every week and worry if they can get what they want to eat everytime
 
