@@ -11,7 +11,7 @@ verify: true # do verify SSL certification
 # sometimes the SSL certification isn't working and you might need to set this to false
 # default: true
 
-=orders:
+orders:
 - id: 'MY_ID' # in string
   name: example # for debugging and logging; will not affect program
   password: MY_PASSWORD
