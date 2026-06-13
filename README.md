@@ -2,10 +2,10 @@
 > A Python script for automatically ordering meals for KCIS students
 
 > [!WARNING]
-> This project is deprecated!
+> The project is being refactored in this branch. Use with caution.
 
 ## Description
-`AutoOrderingSystem` is a Python script that helps KCIS students order meals automatically so that students do not need to deal with the stupid ordering system every week and worry if they can get what they want to eat everytime
+`AutoOrderingSystem` is a Python script that helps KCIS students order meals automatically so that students do not need to deal with the stupid ordering system every week and worry if they can get what they want every time
 
 Features:
 - YAML configuration file
@@ -13,7 +13,7 @@ Features:
 - extendable Python library for ordering: `kcisorder`
 
 ## Installation
-Make sure you have Python 3.13+ installed :3c
+Make sure you have Python 3.13+ installed
 > NOTE: python version below 3.13 is not tested cus im too lazy but it might still work
 
 ```bash
@@ -32,7 +32,7 @@ pip install -r requirements.txt
 ## Usage
 To get started, first configure the `config.yaml`
 
-For more info about the configuration, check `config.yaml` for example config with comments >w<
+For more info about the configuration, check `config.yaml` for example config with comments
 
 Run the script by either:
 
@@ -56,9 +56,10 @@ and
 
 ## Contributing
 If you wanna help me make this script even better, just:
-- Fork the repo >w<
+- Fork the repo
 - Make your changes
 - Open a pull request with love!
+- pls dont bully me with my bad code :3
 
 ## License
 This repo is under the MIT License
